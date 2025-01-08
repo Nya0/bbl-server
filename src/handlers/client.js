@@ -10,6 +10,7 @@ class ClientMessageHandlers {
 
   initializeHandlers() {
     this.handlers.set(1, this.handleRequestRoomList.bind(this));
+    this.handlers.set(2, this.handleKeepAlive.bind(this));
     // Add other client-specific handlers
   }
 
@@ -36,9 +37,6 @@ class ClientMessageHandlers {
 
   handleMessage(socket, serializer) {
     const requestType = serializer.readByte();
-    if (requestType === 2) {
-        return // keepAlive
-    } 
 
     logger.client(`Received Message! Request Type: ${requestType}`);
     
@@ -72,6 +70,8 @@ class ClientMessageHandlers {
     response.writeString("skibidi"); // Clan
     response.writeInt16(0) // Size of pref array
     response.writeInt16(0) // Size of Kills array
+
+    
 
 
     // OLD (before Build 100.79.98.95.12[Public])
@@ -126,7 +126,7 @@ class ClientMessageHandlers {
   }
   /////////////
 
-  handleRequestRoomList(socket, serializer) {
+  handleRequestRoomList(socket) {
     logger.info('Handling request room list');
     const response = new BitSerializer();
 
@@ -140,6 +140,11 @@ class ClientMessageHandlers {
 
     this.masterServer.sendMessage(socket, response.getData());
     logger.info('Room list response sent');
+  }
+
+  handleKeepAlive(socket) {
+    logger.debug(`Received keepalive from ${socket.steamID}`);
+    return true;
   }
 
   // Additional client-specific methods

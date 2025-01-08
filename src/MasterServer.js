@@ -7,6 +7,27 @@ const ClienteHandler = require('./handlers/client');
 
 const logger = require('./utils/logger');
 
+function bufferToHexView(buffer) {
+    const hex = buffer.toString('hex').match(/.{1,2}/g) || [];
+    const decimal = [...buffer];
+    
+    let output = '\nHEX VIEW:\n';
+    for (let i = 0; i < hex.length; i += 16) {
+        const chunk = hex.slice(i, i + 16);
+        // Offset
+        output += `${i.toString(16).padStart(8, '0')}  `;
+        // Hex values
+        output += chunk.map(byte => byte).join(' ').padEnd(48, ' ');
+        output += ' |';
+        // Decimal values
+        output += decimal.slice(i, i + 16).map(byte => 
+            byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.'
+        ).join('');
+        output += '|\n';
+    }
+
+    return output;
+}
 
 class MasterServer {
     constructor(clientPort, serverPort, httpPort) {
@@ -26,6 +47,16 @@ class MasterServer {
         this.startClientServer();
         this.startServerServer();
         this.startHttpServer();
+    }
+
+    shutdown() {
+        for (const [, socket] of this.clients) {
+            socket.destroy();
+        }
+        
+        for (const [, socket] of this.servers) {
+            socket.destroy();
+        }
     }
 
     startClientServer() {
@@ -59,7 +90,7 @@ class MasterServer {
             logger.server(`Got a room list request`);
             try {
                 const roomDetails = Array.from(this.servers.values()).map(server => ({
-                    ip_address: server,
+                    ip_address: "127.0.0.1",
                     port: server.port
                 }));
                 res.json({ data: roomDetails });
@@ -90,6 +121,13 @@ class MasterServer {
 
     setupSocket(socket) {
         let buffer = Buffer.alloc(0);
+        socket.setTimeout(30000); 
+        socket.setKeepAlive(true, 10000);
+        
+        socket.on('timeout', () => {
+            logger[socket.type](`${socket.type} connection timed out`);
+            this.handleDisconnect(socket);
+        });
 
         socket.on('data', (data) => {
             buffer = Buffer.concat([buffer, data]);
@@ -115,16 +153,34 @@ class MasterServer {
     }
 
     processBuffer(socket, buffer) {
+        const MAX_BUFFER_SIZE = 1024 * 16; // 16KB
+        if (buffer.length > MAX_BUFFER_SIZE) {
+            logger.error(`Buffer overflow attempt from ${socket.remoteAddress}`);
+            this.handleDisconnect(socket);
+            return Buffer.alloc(0);
+        }
+
         while (buffer.length >= 4) {
             const messageLength = buffer.readInt32LE(0);
-
+            
+            if (messageLength > MAX_BUFFER_SIZE - 4) {
+                logger.error(`Message too large (${messageLength} bytes) from ${socket.remoteAddress}`);
+                this.handleDisconnect(socket);
+                return Buffer.alloc(0);
+            }
+    
             if (buffer.length >= messageLength + 4) {
                 const messageData = buffer.slice(4, messageLength + 4);
                 buffer = buffer.slice(messageLength + 4);
-
+    
+                // Log received packet
+                logger.info(`Received packet from ${socket.type} (${socket.remoteAddress})`);
+                logger.info(`Packet length: ${messageLength} bytes`);
+                logger.info(bufferToHexView(messageData));
+    
                 try {
                     const serializer = new BitSerializer(messageData);
-
+    
                     if (!socket.initialized) {
                         this.initializeConnection(socket, serializer);
                         socket.initialized = true;
@@ -160,12 +216,15 @@ class MasterServer {
     sendMessage(socket, data) {
         const lengthBuffer = Buffer.alloc(4);
         lengthBuffer.writeInt32LE(data.length);
-        socket.write(Buffer.concat([lengthBuffer, data]), (err) => {
+        const fullPacket = Buffer.concat([lengthBuffer, data]);
+        logger.info(`Sending packet to ${socket.type} (${socket.remoteAddress})`);
+        logger.info(`Packet length: ${data.length} bytes`);
+        logger.info(bufferToHexView(data));
+
+        socket.write(fullPacket, (err) => {
             if (err) {
                 logger.error(`Error sending message: ${err.message}`);
                 this.handleDisconnect(socket);
-            } else {
-                logger.info(`Sent message, length: ${data.length}`);
             }
         });
     }

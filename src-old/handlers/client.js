@@ -4,13 +4,15 @@ const logger = require('../utils/logger');
 class ClientMessageHandlers {
   constructor(masterServer) {
     this.masterServer = masterServer;
-    this.handlers = new Map();
-    this.initializeHandlers();
+    this.handlers = new Map([
+        [1, this.handleRequestRoomList.bind(this)],
+        [2, this.handleKeepAlive.bind(this)]
+    ]);
   }
 
-  initializeHandlers() {
-    this.handlers.set(1, this.handleRequestRoomList.bind(this));
-    // Add other client-specific handlers
+  handleKeepAlive(socket) {
+    logger.debug(`Received keepalive from ${socket.steamID}`);
+    return true;
   }
 
   getHandler(messageType) {
@@ -36,15 +38,14 @@ class ClientMessageHandlers {
 
   handleMessage(socket, serializer) {
     const requestType = serializer.readByte();
-
-    logger.client(`Received Message! Request Type: ${requestType}`);
+    const handler = this.handlers.get(requestType);
     
-    const handler = this.getHandler(requestType);
-    if (handler) {
-        handler(socket, serializer);
-    } else {
+    if (!handler) {
         logger.error(`Unknown request type: ${requestType}`);
+        return false;
     }
+
+      return handler(socket, serializer);
   }
 
 
@@ -52,17 +53,17 @@ class ClientMessageHandlers {
 
   writeClientInfo(response, steamID) {
 
-    response.writeByte(2); // PermissionLevel
-    response.writeByte(10); // Rank
-    response.writeInt32(4); // XP
-    response.writeInt32(100); // KillCount
-    response.writeInt32(50); // DeathCount
-    response.writeInt32(10); // WinCount
-    response.writeInt32(5); // LostCount
-    response.writeInt32(20); // FriendlyShots 
-    response.writeInt32(2); // FriendlyKills
-    response.writeBool(false); // isBanned
-    response.writeString("skibidi"); // Clan
+    // response.writeByte(2); // PermissionLevel
+    // response.writeByte(10); // Rank
+    // response.writeInt32(4); // XP
+    // response.writeInt32(100); // KillCount
+    // response.writeInt32(50); // DeathCount
+    // response.writeInt32(10); // WinCount
+    // response.writeInt32(5); // LostCount
+    // response.writeInt32(20); // FriendlyShots 
+    // response.writeInt32(2); // FriendlyKills
+    // response.writeBool(false); // isBanned
+    // response.writeString("skibidi"); // Clan
 
 
 
@@ -85,6 +86,26 @@ class ClientMessageHandlers {
     // response.writeBool(false); // isBanned
     // response.writeString("skibidi"); // Clan
     // response.writeInt16(0) // Size of pref array
+
+    // 100.79.99.05[Public]
+    response.writeInt64(steamID); // SteamID
+    response.writeString("amogus"); // Name
+    response.writeString("https://media.discordapp.net/stickers/1180619442141536367.webp?size=160"); // AvatarURL
+    response.writeByte(2); // PermissionLevel
+    response.writeByte(10); // Rank
+    response.writeInt32(4); // XP
+    response.writeInt32(100); // KillCount
+    response.writeInt32(50); // DeathCount
+    response.writeInt32(10); // WinCount
+    response.writeInt32(5); // LostCount
+    response.writeInt32(20); // FriendlyShots 
+    response.writeInt32(2); // FriendlyKills
+    response.writeBool(true); // IsPatreonSupporter
+    response.writeBool(true); // IsClanOwner
+    response.writeBool(false); // isBanned
+    response.writeString("skibidi"); // Clan
+    response.writeInt16(0) // Size of pref array
+    response.writeInt16(0) // another "Kills" thing for some reason
   }
 
   writeServerInfo(response, server, key) {

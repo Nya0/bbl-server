@@ -9,6 +9,7 @@ class ServerMessageHandlers {
   }
 
   initializeHandlers() {
+    // 0 is keepaliv?
     this.handlers.set(1, this.ValidateAccount.bind(this));
     this.handlers.set(2, this.UpdateSteamID.bind(this));
     // Add other server-specific handlers
@@ -102,7 +103,7 @@ class ServerMessageHandlers {
 
   writeClientInfo(response, steamID) {
     response.writeInt64(steamID); // SteamID
-    response.writeString(`amogus-${steamID}`); // Name
+    response.writeString(steamID); // Name     response.writeString(`amogus-${steamID}`); // Name
     response.writeString("https://cdn.discordapp.com/attachments/1207824900006355067/1273051272035041280/Screenshot_20240701_101243.png"); // AvatarURL
     response.writeByte(2); // PermissionLevel
     response.writeByte(10); // Rank
