@@ -1,153 +1,136 @@
+// handlers/client.js
 const BitSerializer = require('../BitSerializer');
 const logger = require('../utils/logger');
 
-class ClientMessageHandlers {
-  constructor(masterServer) {
+class ClientMessageHandler {
+  constructor(masterServer, playerService, gameServerService) {
     this.masterServer = masterServer;
+    this.playerService = playerService;
+    this.gameServerService = gameServerService;
     this.handlers = new Map();
     this.initializeHandlers();
   }
 
   initializeHandlers() {
+    // this.handlers.set(0, this.handleKeepAlive.bind(this));
     this.handlers.set(1, this.handleRequestRoomList.bind(this));
-    this.handlers.set(2, this.handleKeepAlive.bind(this));
-    // Add other client-specific handlers
   }
 
-  getHandler(messageType) {
-    return this.handlers.get(messageType);
-  }
-
-  ///////////////////
-
-  handleConnect(socket, serializer) {
+  async handleConnect(socket, serializer) {
     logger.client('Handling client connect');
-    const steamID = serializer.ReadInt64();
+    const steamID = serializer.ReadInt64().toString();
     logger.client(`Steam ID: ${steamID}`);
 
-    socket.isServer = false;
-    socket.steamID = steamID;
+    try {
+      const player = await this.playerService.getOrCreatePlayer(steamID);
+      socket.isServer = false;
+      socket.steamID = steamID;
+      socket.player = player;
 
-    const response = new BitSerializer();
-    response.WriteBool(true); // success
-
-    this.WriteClientInfo(response, steamID);
-    this.masterServer.sendMessage(socket, response.Data);
+      const response = new BitSerializer();
+      response.WriteBool(true);
+      await this.writePlayerData(response, player);
+      this.masterServer.sendMessage(socket, response.Data);
+    } catch (error) {
+      logger.error(`Connect error: ${error.message}`);
+      const response = new BitSerializer();
+      response.WriteBool(false);
+      this.masterServer.sendMessage(socket, response.Data);
+    }
   }
 
   handleMessage(socket, serializer) {
     const requestType = serializer.ReadByte();
 
+
     logger.client(`Received Message! Request Type: ${requestType}`);
-    
     const handler = this.getHandler(requestType);
+    
     if (handler) {
-        handler(socket, serializer);
+      handler(socket, serializer);
     } else {
-        logger.error(`Unknown request type: ${requestType}`);
+      logger.error(`Unknown request type: ${requestType}`);
     }
   }
 
+  async writePlayerData(response, player) {
+    response.WriteInt64(BigInt(player.steamId));
+    response.WriteString(player.name);
+    response.WriteString(player.avatarUrl);
+    response.WriteByte(player.permissionLevel || 0);
+    response.WriteByte(player.rank || 1);
+    response.WriteInt32(player.xp || 0);
+    response.WriteInt32(player.stats.kills || 0);
+    response.WriteInt32(player.stats.deaths || 0);
+    response.WriteInt32(player.stats.wins || 0);
+    response.WriteInt32(player.stats.losses || 0);
+    response.WriteInt32(player.stats.friendlyShots || 0);
+    response.WriteInt32(player.stats.friendlyKills || 0);
+    response.WriteBool(player.isPatreonBacker || false);
+    response.WriteBool(player.isClanOwner || false);
+    response.WriteBool(player.isBanned || false);
+    response.WriteString(player.clan || "");
+    response.WriteInt16(0); // No preferences for now
 
-  ////////////////////
-
-  WriteClientInfo(response, steamID) {
-    response.WriteInt64(steamID); // SteamID
-    response.WriteString(`amogus-${steamID}`); // Name
-    response.WriteString("https://media.discordapp.net/attachments/1270930588861206569/1326696841147846766/H3VR_.jpeg?ex=67805e37&is=677f0cb7&hm=7790ef5657e3fa22a60078aebba7ae7270991582b1fcf7983bb97b91115e9a85&=&width=764&height=764"); // AvatarURL
-    response.WriteByte(2); // PermissionLevel
-    response.WriteByte(120); // Rank
-    response.WriteInt32(1000); // XP
-    response.WriteInt32(100); // KillCount
-    response.WriteInt32(50); // DeathCount
-    response.WriteInt32(10); // WinCount
-    response.WriteInt32(5); // LostCount
-    response.WriteInt32(20); // FriendlyShots 
-    response.WriteInt32(2); // FriendlyKills
-    response.WriteBool(true); // IsPatreonBacker
-    response.WriteBool(true); // IsClanOwner
-    response.WriteBool(false); // isBanned
-    response.WriteString("skibidi"); // Clan
-    response.WriteInt16(0) // Size of pref array
-    response.WriteInt16(0) // Size of Kills array
-
-    
-
-
-    // OLD (before Build 100.79.98.95.12[Public])
-    // response.WriteInt32(123451); // PlayerID
-    // response.WriteInt64(steamID); // SteamID
-    // response.WriteString("amogus"); // Name
-    // response.WriteString("https://media.discordapp.net/stickers/1180619442141536367.webp?size=160"); // AvatarURL
-    // response.WriteByte(2); // PermissionLevel
-    // response.WriteByte(10); // Rank
-    // response.WriteInt32(4); // XP
-    // response.WriteInt32(100); // KillCount
-    // response.WriteInt32(50); // DeathCount
-    // response.WriteInt32(10); // WinCount
-    // response.WriteInt32(5); // LostCount
-    // response.WriteInt32(20); // FriendlyShots 
-    // response.WriteInt32(2); // FriendlyKills
-    // response.WriteBool(true); // IsPatreonSupporter
-    // response.WriteBool(true); // IsClanOwner
-    // response.WriteBool(false); // isBanned
-    // response.WriteString("skibidi"); // Clan
-    // response.WriteInt16(0) // Size of pref array
-  }
-
-  WriteServerInfo(response, server, key) {
-    let ip, port;
-    if (key.startsWith('::ffff:')) {
-      [ip, port] = key.split('::ffff:')[1].split(':');
-    } else {
-      [ip, port] = key.split(':');
+    // Write weapon kills
+    const weaponKills = player.weaponKills || new Map();
+    response.WriteInt16(weaponKills.size);
+    for (const [weaponId, kills] of weaponKills) {
+      response.WriteInt16(parseInt(weaponId));
+      response.WriteInt32(kills);
     }
-    
-    logger.info(`Server key: ${key}`);
-    logger.info(`IP: ${ip}, Port: ${port}`);
-    logger.info(`Server Name: ${server.serverName}`);
-    logger.info(`Game Mode: ${server.gameMode}`);
-    logger.info(`Max Players: ${server.maxPlayers}`);
-    logger.info(`Current Players: ${server.currentPlayers}`);
-    logger.info(`Is Protected: ${server.isProtected}`);
-    logger.info(`Server Steam ID: ${server.serverSteamID || ""}`);
-
-    response.WriteString(server.serverName); // RoomName
-    response.WriteString(ip); // IP
-    response.WriteInt32(parseInt(port)); // Port
-    response.WriteString(server.gameMap); // GameMap
-    response.WriteString(server.gameMode); // GameMode
-    response.WriteString(server.extraInfo); // ExtraInfo
-    response.WriteInt32(server.maxPlayers); // MaxCount
-    response.WriteInt32(server.currentPlayers || 2); // CurrentCount
-    response.WriteBool(server.isProtected); // isProtected
-    response.WriteString(server.serverSteamID || "02"); // Server Steam ID, if available
-    response.WriteByte(0) // Region :	US (0:EU,1:US,2:AS)
-  }
-  /////////////
-
-  handleRequestRoomList(socket) {
-    logger.info('Handling request room list');
-    const response = new BitSerializer();
-
-    response.WriteByte(1);
-    response.WriteInt16(this.masterServer.servers.size);
-    
-    logger.info(`Number of servers: ${this.masterServer.servers.size}`);
-    this.masterServer.servers.forEach((server, key) => {
-      this.WriteServerInfo(response, server, key);
-    });
-
-    this.masterServer.sendMessage(socket, response.Data);
-    logger.info('Room list response sent');
   }
 
-  handleKeepAlive(socket) {
-    logger.debug(`Received keepalive from ${socket.steamID}`);
+  async handleRequestRoomList(socket) {
+    try {
+      const servers = await this.gameServerService.getActiveServers();
+      
+      const response = new BitSerializer();
+      response.WriteByte(1);
+      response.WriteInt16(servers.length);
+      
+      for (const server of servers) {
+        this.writeServerInfo(response, server);
+      }
+
+      this.masterServer.sendMessage(socket, response.Data);
+      logger.info('Room list response sent');
+    } catch (error) {
+      logger.error(`Room list error: ${error.message}`);
+    }
+  }
+
+  writeServerInfo(response, server) {
+    response.WriteString(server.serverName);
+    response.WriteString(server.ip);
+    response.WriteInt32(server.port);
+    response.WriteString(server.gameMap);
+    response.WriteString(server.gameMode);
+    response.WriteString(server.extraInfo);
+    response.WriteInt32(server.maxPlayers);
+    response.WriteInt32(server.currentPlayers || 0);
+    response.WriteBool(server.isProtected);
+    response.WriteString(server.serverSteamId || "");
+    response.WriteByte(server.region);
+  }
+
+  async handleKeepAlive(socket) {
+    if (!socket.steamID) {
+      return false;
+    }
+
+    logger.debug(`Keepalive from client: ${socket.steamID}`);
+    try {
+      await this.playerService.updateLastSeen(socket.steamID.toString());
+    } catch (error) {
+      logger.error(`Error updating client last seen: ${error.message}`);
+    }
     return true;
   }
 
-  // Additional client-specific methods
+  getHandler(messageType) {
+    return this.handlers.get(messageType);
+  }
 }
 
-module.exports = ClientMessageHandlers;
+module.exports = ClientMessageHandler;

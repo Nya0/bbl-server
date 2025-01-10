@@ -60,7 +60,16 @@ class BitSerializer {
 
     Check() {
         if (!this.inuse) {
-            throw new Error("Serializer is not in use !!!");
+            throw new Error("Serializer is not in use!");
+        }
+        if (!this.buffer) {
+            throw new Error("Buffer is null!");
+        }
+        if (this.readPosition < 0 || this.writePosition < 0) {
+            throw new Error("Invalid position!");
+        }
+        if (this.readPosition > this.buffer.length) {
+            throw new Error("Read position exceeds buffer length!");
         }
     }
 
@@ -70,6 +79,26 @@ class BitSerializer {
       this.increaseBuffer(1);
       this.buffer[this.readPosition] = value;
       this.readPosition++;
+    }
+
+    WriteBytes(bytes) {
+        this.Check();
+        
+        if (!bytes) {
+            this.WriteUInt16(0);
+            return;
+        }
+        
+        const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
+        
+        if (buffer.length > 65535) {
+            throw new Error(`Byte array too long: ${buffer.length} bytes exceeds maximum of 65535 bytes`);
+        }
+        
+        this.WriteUInt16(buffer.length);
+        if (buffer.length > 0) {
+            this.WriteDirectly(buffer);
+        }
     }
 
     WriteDirectly(values) {
@@ -141,17 +170,19 @@ class BitSerializer {
     }
 
     WriteString(value) {
-        console.log(`Before WriteString - readPos: ${this.readPosition}, writePos: ${this.writePosition}`);
         this.Check();
-        if (value === undefined || value === null) {
-            value = '';
-        }
-        const bytes = Buffer.from(value, 'utf8');
-        if (bytes.length > 65535) { // Max UInt16 value
+
+        const str = (value ?? '').toString();
+        const bytes = Buffer.from(str, 'utf8');
+        
+        if (bytes.length > 65535) {
             throw new Error(`String too long: ${bytes.length} bytes exceeds maximum of 65535 bytes`);
         }
+        
         this.WriteUInt16(bytes.length);
-        this.WriteDirectly(bytes);
+        if (bytes.length > 0) {
+            this.WriteDirectly(bytes);
+        }
     }
     
     ReadByte() {
@@ -162,18 +193,20 @@ class BitSerializer {
     ReadBytes() {
         this.Check();
         const length = this.ReadUInt16();
-        if (length === undefined || length < 0) {
-            throw new Error(`Invalid string length: ${length}`);
+        
+        if (length === 0) {
+            return Buffer.alloc(0);
         }
+    
         if (this.readPosition + length > this.buffer.length) {
             throw new Error(`Buffer underrun: Trying to read ${length} bytes at position ${this.readPosition} in buffer of length ${this.buffer.length}`);
         }
+    
         const array = Buffer.alloc(length);
         this.buffer.copy(array, 0, this.readPosition, this.readPosition + length);
         this.readPosition += length;
         return array;
     }
-
     ReadInt16() {
         this.Check();
         const value = this.buffer.readInt16LE(this.readPosition);
@@ -241,8 +274,32 @@ class BitSerializer {
 
     ReadString() {
         this.Check();
-        const bytes = this.ReadBytes();
-        return bytes.toString('utf8');
+        try {
+            const length = this.ReadUInt16();
+            
+
+            if (length === 0) {
+                return '';
+            }
+    
+            if (this.readPosition + length > this.buffer.length) {
+                throw new Error(`Buffer underrun: Trying to read string of length ${length} at position ${this.readPosition} in buffer of length ${this.buffer.length}`);
+            }
+    
+            const stringBuffer = Buffer.alloc(length);
+            this.buffer.copy(stringBuffer, 0, this.readPosition, this.readPosition + length);
+            this.readPosition += length;
+    
+            const result = stringBuffer.toString('utf8');
+            
+            if (result === undefined) {
+                throw new Error('Malformed UTF-8 string data');
+            }
+    
+            return result;
+        } catch (error) {
+            throw new Error(`Error reading string: ${error.message}`);
+        }
     }
 
     ReadEnum() {
