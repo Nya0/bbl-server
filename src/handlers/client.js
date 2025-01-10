@@ -22,21 +22,21 @@ class ClientMessageHandlers {
 
   handleConnect(socket, serializer) {
     logger.client('Handling client connect');
-    const steamID = serializer.readInt64();
+    const steamID = serializer.ReadInt64();
     logger.client(`Steam ID: ${steamID}`);
 
     socket.isServer = false;
     socket.steamID = steamID;
 
     const response = new BitSerializer();
-    response.writeBool(true); // success
+    response.WriteBool(true); // success
 
-    this.writeClientInfo(response, steamID);
-    this.masterServer.sendMessage(socket, response.getData());
+    this.WriteClientInfo(response, steamID);
+    this.masterServer.sendMessage(socket, response.Data);
   }
 
   handleMessage(socket, serializer) {
-    const requestType = serializer.readByte();
+    const requestType = serializer.ReadByte();
 
     logger.client(`Received Message! Request Type: ${requestType}`);
     
@@ -51,51 +51,51 @@ class ClientMessageHandlers {
 
   ////////////////////
 
-  writeClientInfo(response, steamID) {
-    response.writeInt64(steamID); // SteamID
-    response.writeString(`amogus-${steamID}`); // Name
-    response.writeString("https://cdn.discordapp.com/attachments/1207824900006355067/1273051272035041280/Screenshot_20240701_101243.png"); // AvatarURL
-    response.writeByte(2); // PermissionLevel
-    response.writeByte(10); // Rank
-    response.writeInt32(4); // XP
-    response.writeInt32(100); // KillCount
-    response.writeInt32(50); // DeathCount
-    response.writeInt32(10); // WinCount
-    response.writeInt32(5); // LostCount
-    response.writeInt32(20); // FriendlyShots 
-    response.writeInt32(2); // FriendlyKills
-    response.writeBool(true); // IsPatreonBacker
-    response.writeBool(true); // IsClanOwner
-    response.writeBool(false); // isBanned
-    response.writeString("skibidi"); // Clan
-    response.writeInt16(0) // Size of pref array
-    response.writeInt16(0) // Size of Kills array
+  WriteClientInfo(response, steamID) {
+    response.WriteInt64(steamID); // SteamID
+    response.WriteString(`amogus-${steamID}`); // Name
+    response.WriteString("https://media.discordapp.net/attachments/1270930588861206569/1326696841147846766/H3VR_.jpeg?ex=67805e37&is=677f0cb7&hm=7790ef5657e3fa22a60078aebba7ae7270991582b1fcf7983bb97b91115e9a85&=&width=764&height=764"); // AvatarURL
+    response.WriteByte(2); // PermissionLevel
+    response.WriteByte(120); // Rank
+    response.WriteInt32(1000); // XP
+    response.WriteInt32(100); // KillCount
+    response.WriteInt32(50); // DeathCount
+    response.WriteInt32(10); // WinCount
+    response.WriteInt32(5); // LostCount
+    response.WriteInt32(20); // FriendlyShots 
+    response.WriteInt32(2); // FriendlyKills
+    response.WriteBool(true); // IsPatreonBacker
+    response.WriteBool(true); // IsClanOwner
+    response.WriteBool(false); // isBanned
+    response.WriteString("skibidi"); // Clan
+    response.WriteInt16(0) // Size of pref array
+    response.WriteInt16(0) // Size of Kills array
 
     
 
 
     // OLD (before Build 100.79.98.95.12[Public])
-    // response.writeInt32(123451); // PlayerID
-    // response.writeInt64(steamID); // SteamID
-    // response.writeString("amogus"); // Name
-    // response.writeString("https://media.discordapp.net/stickers/1180619442141536367.webp?size=160"); // AvatarURL
-    // response.writeByte(2); // PermissionLevel
-    // response.writeByte(10); // Rank
-    // response.writeInt32(4); // XP
-    // response.writeInt32(100); // KillCount
-    // response.writeInt32(50); // DeathCount
-    // response.writeInt32(10); // WinCount
-    // response.writeInt32(5); // LostCount
-    // response.writeInt32(20); // FriendlyShots 
-    // response.writeInt32(2); // FriendlyKills
-    // response.writeBool(true); // IsPatreonSupporter
-    // response.writeBool(true); // IsClanOwner
-    // response.writeBool(false); // isBanned
-    // response.writeString("skibidi"); // Clan
-    // response.writeInt16(0) // Size of pref array
+    // response.WriteInt32(123451); // PlayerID
+    // response.WriteInt64(steamID); // SteamID
+    // response.WriteString("amogus"); // Name
+    // response.WriteString("https://media.discordapp.net/stickers/1180619442141536367.webp?size=160"); // AvatarURL
+    // response.WriteByte(2); // PermissionLevel
+    // response.WriteByte(10); // Rank
+    // response.WriteInt32(4); // XP
+    // response.WriteInt32(100); // KillCount
+    // response.WriteInt32(50); // DeathCount
+    // response.WriteInt32(10); // WinCount
+    // response.WriteInt32(5); // LostCount
+    // response.WriteInt32(20); // FriendlyShots 
+    // response.WriteInt32(2); // FriendlyKills
+    // response.WriteBool(true); // IsPatreonSupporter
+    // response.WriteBool(true); // IsClanOwner
+    // response.WriteBool(false); // isBanned
+    // response.WriteString("skibidi"); // Clan
+    // response.WriteInt16(0) // Size of pref array
   }
 
-  writeServerInfo(response, server, key) {
+  WriteServerInfo(response, server, key) {
     let ip, port;
     if (key.startsWith('::ffff:')) {
       [ip, port] = key.split('::ffff:')[1].split(':');
@@ -112,17 +112,17 @@ class ClientMessageHandlers {
     logger.info(`Is Protected: ${server.isProtected}`);
     logger.info(`Server Steam ID: ${server.serverSteamID || ""}`);
 
-    response.writeString(server.serverName); // RoomName
-    response.writeString(ip); // IP
-    response.writeInt32(parseInt(port)); // Port
-    response.writeString(server.gameMap); // GameMap
-    response.writeString(server.gameMode); // GameMode
-    response.writeString(server.extraInfo); // ExtraInfo
-    response.writeInt32(server.maxPlayers); // MaxCount
-    response.writeInt32(server.currentPlayers || 2); // CurrentCount
-    response.writeBool(server.isProtected); // isProtected
-    response.writeString(server.serverSteamID || "02"); // Server Steam ID, if available
-    response.writeByte(0) // Region :	US (0:EU,1:US,2:AS)
+    response.WriteString(server.serverName); // RoomName
+    response.WriteString(ip); // IP
+    response.WriteInt32(parseInt(port)); // Port
+    response.WriteString(server.gameMap); // GameMap
+    response.WriteString(server.gameMode); // GameMode
+    response.WriteString(server.extraInfo); // ExtraInfo
+    response.WriteInt32(server.maxPlayers); // MaxCount
+    response.WriteInt32(server.currentPlayers || 2); // CurrentCount
+    response.WriteBool(server.isProtected); // isProtected
+    response.WriteString(server.serverSteamID || "02"); // Server Steam ID, if available
+    response.WriteByte(0) // Region :	US (0:EU,1:US,2:AS)
   }
   /////////////
 
@@ -130,15 +130,15 @@ class ClientMessageHandlers {
     logger.info('Handling request room list');
     const response = new BitSerializer();
 
-    response.writeByte(1);
-    response.writeInt16(this.masterServer.servers.size);
+    response.WriteByte(1);
+    response.WriteInt16(this.masterServer.servers.size);
     
     logger.info(`Number of servers: ${this.masterServer.servers.size}`);
     this.masterServer.servers.forEach((server, key) => {
-      this.writeServerInfo(response, server, key);
+      this.WriteServerInfo(response, server, key);
     });
 
-    this.masterServer.sendMessage(socket, response.getData());
+    this.masterServer.sendMessage(socket, response.Data);
     logger.info('Room list response sent');
   }
 

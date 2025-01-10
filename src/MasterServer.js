@@ -90,7 +90,7 @@ class MasterServer {
             logger.server(`Got a room list request`);
             try {
                 const roomDetails = Array.from(this.servers.values()).map(server => ({
-                    ip_address: "127.0.0.1",
+                    ip_address: server.ip,
                     port: server.port
                 }));
                 res.json({ data: roomDetails });
