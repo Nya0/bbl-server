@@ -204,8 +204,8 @@ sendMessage(socket, data) {
 
 setupSocket(socket) {
     let buffer = Buffer.alloc(0);
-    socket.setTimeout(parseInt(process.env.KEEPALIVE_TIMEOUT)); 
-    socket.setKeepAlive(true, parseInt(process.env.KEEPALIVE_INTERVAL));
+    // socket.setTimeout(parseInt(process.env.KEEPALIVE_TIMEOUT)); 
+    // socket.setKeepAlive(true, parseInt(process.env.KEEPALIVE_INTERVAL));
     
     socket.on('timeout', () => {
         logger[socket.type](`${socket.type} connection timed out`);

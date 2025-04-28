@@ -72,7 +72,6 @@ class BitSerializer {
             throw new Error("Read position exceeds buffer length!");
         }
     }
-
     
     WriteByte(value) {
       this.Check();

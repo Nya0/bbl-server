@@ -1,3 +1,4 @@
 .env
 src-old
 logs
+node_modules

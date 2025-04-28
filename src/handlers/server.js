@@ -1,4 +1,5 @@
 const BitSerializer = require('../BitSerializer');
+const Format = require('../utils/format');
 const logger = require('../utils/logger');
 
 class ServerMessageHandler {
@@ -93,7 +94,7 @@ class ServerMessageHandler {
 			isBanned: serializer.ReadBool(),
 			clan: serializer.ReadString(),
 			prefs: serializer.ReadBytes(),
-			weaponKills: this.parseWeaponKills(serializer.ReadBytes())
+			weaponKills: Format.parseWeaponKills(serializer.ReadBytes())
     };
 
 
@@ -152,7 +153,7 @@ class ServerMessageHandler {
     try {
       const player = await this.playerService.getOrCreatePlayer(steamId);
       const response = new BitSerializer();
-      await this.writePlayerData(response, player);
+      Format.writePlayerData(response, player)
       this.masterServer.sendMessage(socket, response.Data);
     } catch (error) {
       logger.error(`Account validation error: ${error.message}`);
@@ -193,6 +194,7 @@ class ServerMessageHandler {
     const playerCount = serializer.ReadByte();
     
     try {
+      z
       // Process stats for each player
       for (let i = 0; i < playerCount; i++) {
         const steamId = serializer.ReadInt64().toString()
@@ -211,33 +213,6 @@ class ServerMessageHandler {
     }
   }
 
-  async writePlayerData(response, player) {
-    response.WriteInt64(BigInt(player.steamId));
-    response.WriteString(player.name);
-    response.WriteString(player.avatarUrl);
-    response.WriteByte(player.permissionLevel || 0);
-    response.WriteByte(player.rank || 1);
-    response.WriteInt32(player.xp || 0);
-    response.WriteInt32(player.stats.kills || 0);
-    response.WriteInt32(player.stats.deaths || 0);
-    response.WriteInt32(player.stats.wins || 0);
-    response.WriteInt32(player.stats.losses || 0);
-    response.WriteInt32(player.stats.friendlyShots || 0);
-    response.WriteInt32(player.stats.friendlyKills || 0);
-    response.WriteBool(player.isPatreonBacker || false);
-    response.WriteBool(player.isClanOwner || false);
-    response.WriteBool(player.isBanned || false);
-    response.WriteString(player.clan || "");
-    response.WriteInt16(0); // No preferences for now
-
-    // Write weapon kills
-    const weaponKills = player.weaponKills || new Map();
-    response.WriteInt16(weaponKills.size);
-    for (const [weaponId, kills] of weaponKills) {
-      response.WriteInt16(parseInt(weaponId));
-      response.WriteInt32(kills);
-    }
-  }
 
   getHandler(messageType) {
     return this.handlers.get(messageType);
